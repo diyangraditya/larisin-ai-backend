@@ -10,6 +10,9 @@ app = FastAPI()
 
 load_dotenv()
 
+main_api = os.getenv("OPENAI_AZURE_API")
+secondary_api = os.getenv("SECONDARY_OPENAI_AZURE_API")
+
 @app.get("/")
 async def read_root():
     return {"Hello": "World"}
@@ -18,7 +21,7 @@ async def read_root():
 async def generate():
     client = AzureOpenAI(
         azure_endpoint=os.getenv("ENDPOINT_AZURE_OPENAI"),
-        api_key=os.getenv("OPENAI_AZURE_API"),
+        api_key=main_api,
         api_version="2024-05-01-preview",
     )
     response = client.chat.completions.create(
