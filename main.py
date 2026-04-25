@@ -5,6 +5,7 @@ import requests
 
 from datetime import datetime
 from dotenv import load_dotenv
+load_dotenv()
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +14,6 @@ from pydantic import BaseModel
 from typing import List, Optional
 from larisin_pkg.db.cosmos import save_history
 
-load_dotenv()
 
 app = FastAPI(title="Larisin AI API")
 
