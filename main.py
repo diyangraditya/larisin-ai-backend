@@ -27,14 +27,16 @@ app.add_middleware(
 )
 
 # setup azure client
-main_api = os.getenv("OPENAI_AZURE_API")
-secondary_api = os.getenv("SECONDARY_OPENAI_AZURE_API")
-the_azure_endpoint = os.getenv("ENDPOINT_AZURE_OPENAI")
+AZURE_OPENAI_API_KEY = os.getenv("OPENAI_AZURE_API")
+SECONDARY_AZURE_OPENAI_API_KEY_ = os.getenv("SECONDARY_OPENAI_AZURE_API")
+AZURE_OPENAI_ENDPOINT = os.getenv("ENDPOINT_AZURE_OPENAI")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
+AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
 client = AzureOpenAI(
-    azure_endpoint=the_azure_endpoint,
-    api_key=main_api,
-    api_version="2024-05-01-preview",
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_key=AZURE_OPENAI_API_KEY,
+    api_version=AZURE_OPENAI_API_VERSION,
 )
 
 # setup pydactic models ---
@@ -72,15 +74,15 @@ async def generate_image(file: UploadFile = File(...),
 
     try:
         # Panggilan ke Azure DALL-E (Pastikan deployment name DALL-E kamu benar)
-        # response = client.images.generate(
-        #     model="dall-e-3", # ganti dengan nama deployment DALL-E di Azure kamu
-        #     prompt=image_prompt,
-        #     n=1
-        # )
-        # result_image_url = response.data[0].url
+        response = client.images.generate(
+            model="gpt-image-2-2026-04-21", 
+            prompt=image_prompt,
+            n=1
+        )
+        result_image_url = response.data[0].url
         
         # --- DUMMY RESPONSE SEMENTARA AGAR FE BISA JALAN ---
-        result_image_url = "https://dummyimage.com/600x800/000/fff&text=Hasil+Generate+AI"
+        # result_image_url = "https://dummyimage.com/600x800/000/fff&text=Hasil+Generate+AI"
         
         return {
             "job_id": "job-12345",
@@ -88,13 +90,13 @@ async def generate_image(file: UploadFile = File(...),
             "message": "Gambar berhasil diproses"
         }
     except Exception as e:
-        return {"error": str(e)}
+        print(f"Error generating image: {e}")                                                                     
+        raise HTTPException(status_code=500, detail=f"AI gagal memproses gambar: {str(e)}") 
 
 @app.post("/api/v1/ai/generate-caption")
 async def generate_caption(request: CaptionRequest):
     
-    # --- 1. SETUP SYSTEM PROMPT ---
-    # Saya perjelas struktur JSON di prompt agar AI tidak "berhalusinasi" saat nge-return data
+    # SETUP SYSTEM PROMPT
     system_prompt = (
         f"Kamu adalah seorang Social Media Manager dan Copywriter pro. "
         f"Target audiens adalah: {request.business_target}. "
@@ -108,11 +110,11 @@ async def generate_caption(request: CaptionRequest):
 
     user_prompt = f"Buatkan caption untuk mempromosikan {request.business_jenis} dengan fokus pada {request.fokus_promosi}."
 
-    # --- 2. PANGGIL API AI ---
+    # CALL LLM
     try:
         response = client.chat.completions.create(
-            # model=os.getenv("AZURE_MODEL", "gpt-4"),
-            model="openai/gpt-oss-120b:free",
+            model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.4"),
+            # model="gpt-5.4",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -128,29 +130,28 @@ async def generate_caption(request: CaptionRequest):
         captions = ai_result.get("captions", [])
         hashtags = ai_result.get("hashtags", [])
 
-        # Validasi darurat: Jika AI aneh dan tidak membalas list caption
+        # Emergency Validation: If AI fails to return list of captions
         if not captions:
             raise ValueError("AI gagal menghasilkan caption yang valid.")
 
     except Exception as e:
-        # Jika AI gagal (misal: timeout atau kuota habis), kembalikan error 500 ke Frontend
+        # If AI fails (ex: timeout or out of tokens), return 500 error to Frontend
         print(f"Error dari AI Engine: {e}")
         raise HTTPException(status_code=500, detail=f"AI gagal memproses: {str(e)}")
 
-    # --- 3. SIMPAN KE AZURE COSMOS DB ---
-    # Kita siapkan data dictionary-nya terlebih dahulu
+    # STORE TO AZURE COSMOS DB
     history_data = {
-        "id": str(uuid.uuid4()),               # UUID Unik sebagai Primary Key Dokumen
-        "user_id": "demo-user-123",            # Partition Key (Hardcoded sementara)
-        "timestamp": datetime.utcnow().isoformat() + "Z", # Format waktu standar ISO
-        "input_metadata": request.dict(),      # Menyimpan apa saja yang diminta user
-        "result_captions": captions,           # Hasil output AI
+        "id": str(uuid.uuid4()),               # Document Primary Key
+        "user_id": "demo-user-123",            # Partition Key (Temporarily Hardcoded)
+        "timestamp": datetime.utcnow().isoformat() + "Z", # standar ISO time format
+        "input_metadata": request.model_dump(),      # store any input from the user
+        "result_captions": captions,           # output AI
         "result_hashtags": hashtags
     }
 
     try:
         # Memanggil fungsi save_history yang sudah kita buat sebelumnya
-        await save_history(history_data)
+        save_history(history_data)
         print(f"[SUCCESS] History tersimpan di Cosmos DB dengan ID: {history_data['id']}")
     except Exception as db_error:
         print(f"[WARNING] Gagal simpan ke Cosmos DB (Non-fatal): {db_error}")
