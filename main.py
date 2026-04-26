@@ -114,7 +114,7 @@ async def generate_caption(request: CaptionRequest):
     try:
         response = client.chat.completions.create(
             model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.4"),
-            # model="gpt-5.4",
+            # model=AZURE_OPENAI_DEPLOYMENT_NAME,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
