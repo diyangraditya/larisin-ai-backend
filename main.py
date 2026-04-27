@@ -1,6 +1,7 @@
 import os
 import json
 import uuid
+import base64
 import requests
 
 from datetime import datetime
@@ -32,11 +33,21 @@ SECONDARY_AZURE_OPENAI_API_KEY_ = os.getenv("SECONDARY_OPENAI_AZURE_API")
 AZURE_OPENAI_ENDPOINT = os.getenv("ENDPOINT_AZURE_OPENAI")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+AZURE_OPENAI_IMAGE_API_KEY = os.getenv("AZURE_OPENAI_IMAGE_API")
+ENDPOINT_AZURE_OPENAI_IMAGE = os.getenv("ENDPOINT_AZURE_OPENAI_IMAGE")
+AZURE_OPENAI_API_IMAGE_VERSION = os.getenv("AZURE_OPENAI_API_IMAGE_VERSION")
+AZURE_OPENAI_IMAGE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_IMAGE_DEPLOYMENT_NAME")
 
 client = AzureOpenAI(
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_OPENAI_API_KEY,
     api_version=AZURE_OPENAI_API_VERSION,
+)
+
+photo_client = AzureOpenAI(
+    azure_endpoint=ENDPOINT_AZURE_OPENAI_IMAGE,
+    api_key=AZURE_OPENAI_IMAGE_API_KEY,
+    api_version=AZURE_OPENAI_API_IMAGE_VERSION,
 )
 
 # setup pydactic models ---
@@ -53,7 +64,8 @@ async def read_root():
     return {"message": "the backend is running"}
 
 @app.post("/api/v1/ai/generate-image")
-async def generate_image(file: UploadFile = File(...),
+async def generate_image(
+    file: UploadFile = File(...),
     ukuran_rasio: str = Form(...),
     fungsi_edit: str = Form(...),
     business_jenis: str = Form(...),
@@ -73,16 +85,14 @@ async def generate_image(file: UploadFile = File(...),
     )
 
     try:
-        # Panggilan ke Azure DALL-E (Pastikan deployment name DALL-E kamu benar)
-        response = client.images.generate(
-            model="gpt-image-2-2026-04-21", 
+        response = photo_client.images.generate(
+            model=os.getenv("AZURE_OPENAI_IMAGE_DEPLOYMENT_NAME", "gpt-image-1.5"), 
             prompt=image_prompt,
             n=1
         )
-        result_image_url = response.data[0].url
-        
-        # --- DUMMY RESPONSE SEMENTARA AGAR FE BISA JALAN ---
-        # result_image_url = "https://dummyimage.com/600x800/000/fff&text=Hasil+Generate+AI"
+        # gpt-image-1 series always returns base64, never a URL
+        image_base64 = response.data[0].b64_json
+        result_image_url = f"data:image/png;base64,{image_base64}"
         
         return {
             "job_id": "job-12345",
@@ -113,8 +123,7 @@ async def generate_caption(request: CaptionRequest):
     # CALL LLM
     try:
         response = client.chat.completions.create(
-            model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-5.4"),
-            # model=AZURE_OPENAI_DEPLOYMENT_NAME,
+            model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o"),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
