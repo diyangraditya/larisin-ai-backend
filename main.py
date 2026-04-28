@@ -14,6 +14,7 @@ from openai import AzureOpenAI
 from pydantic import BaseModel
 from typing import List, Optional
 from larisin_pkg.db.cosmos import save_history
+from larisin_pkg.db.blob import upload_image
 
 
 app = FastAPI(title="Larisin AI API")
@@ -74,9 +75,20 @@ async def generate_image(
     business_gaya_promosi: str = Form(...),
     instruksi_tambahan: Optional[str] = Form(None)
 ):
-    # bisa proses file.read() untuk dikirim ke Azure atau di-save ke Blob Storage
-    # Karena DALL-E 3 di Azure OpenAI generasinya via Text-to-Image, kamu perlu merakit prompt gambar.
-    
+    # Read File and Upload Photo to Blob
+    file_bytes = await file.read()
+    try:
+        original_image_url = await upload_image(
+            image_bytes=file_bytes, 
+            filename=file.filename, 
+            content_type=file.content_type
+        )
+        print(f"Foto asli berhasil diupload: {original_image_url}")
+    except Exception as e:
+        print(f"Gagal upload foto asli ke Blob: {e}")
+        original_image_url = None
+
+    # Construct Image Prompt
     image_prompt = (
         f"Buatkan foto studio yang aesthetic dan profesional untuk sebuah {business_jenis} business. "
         f"Tema warna harus seperti ini {business_warna}. "
@@ -84,21 +96,23 @@ async def generate_image(
         f"Additional request: {instruksi_tambahan if instruksi_tambahan else 'Make it aesthetic and hyper-realistic'}."
     )
 
+    # Call Azure gpt-image-1.5
     try:
-        response = photo_client.images.generate(
-            model=os.getenv("AZURE_OPENAI_IMAGE_DEPLOYMENT_NAME", "gpt-image-1.5"), 
+        response = client.images.generate(
+            model="gpt-image-1.5-2025-12-16",
             prompt=image_prompt,
             n=1
         )
-        # gpt-image-1 series always returns base64, never a URL
-        image_base64 = response.data[0].b64_json
-        result_image_url = f"data:image/png;base64,{image_base64}"
+        result_image_url = response.data[0].url
         
+        # Response to Frontend
         return {
             "job_id": "job-12345",
-            "result_image_url": result_image_url,
+            "original_image_url": original_image_url, # FE could use this for comparison Before/After
+            "result_image_url": result_image_url,     # URL image from gpt-image-1.5
             "message": "Gambar berhasil diproses"
         }
+        
     except Exception as e:
         print(f"Error generating image: {e}")                                                                     
         raise HTTPException(status_code=500, detail=f"AI gagal memproses gambar: {str(e)}") 
