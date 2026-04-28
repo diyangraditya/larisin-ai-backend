@@ -1,6 +1,6 @@
 import os
 import uuid
-from azure.storage.blob import BlobServiceClient
+from azure.storage.blob import BlobServiceClient, ContentSettings
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,13 +24,13 @@ except Exception as e:
     print(f"[BLOB] Error initializing container: {e}")
 
 
-async def upload_image(image_bytes: bytes, filename: str = None, content_type: str = "image/png") -> str:
+def upload_image(image_bytes: bytes, filename: str = None, content_type: str = "image/png") -> str:
     """
     Upload raw image bytes to Azure Blob Storage.
 
     Args:
-        image_bytes: Raw bytes of the image to upload.
-        filename:    Optional blob name. Auto-generates a UUID-based name if not provided.
+        image_bytes:  Raw bytes of the image to upload.
+        filename:     Blob name (e.g. "originals/photo.jpg" or auto-generated UUID path).
         content_type: MIME type of the image (default: image/png).
 
     Returns:
@@ -47,7 +47,7 @@ async def upload_image(image_bytes: bytes, filename: str = None, content_type: s
     blob_client.upload_blob(
         image_bytes,
         overwrite=True,
-        content_settings={"content_type": content_type},
+        content_settings=ContentSettings(content_type=content_type),
     )
 
     # Build public URL from container URL base

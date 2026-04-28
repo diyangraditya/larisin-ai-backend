@@ -98,12 +98,13 @@ async def generate_image(
 
     # Call Azure gpt-image-1.5
     try:
-        response = client.images.generate(
-            model="gpt-image-1.5-2025-12-16",
+        response = photo_client.images.generate(
+            model=os.getenv("AZURE_OPENAI_IMAGE_DEPLOYMENT_NAME", "gpt-image-1.5"),
             prompt=image_prompt,
             n=1
         )
-        result_image_url = response.data[0].url
+        result_image_base64 = response.data[0].b64_json
+        result_image_url = f"data:image/png;base64,{result_image_base64}"
         
         # Response to Frontend
         return {
