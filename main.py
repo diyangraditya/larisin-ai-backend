@@ -30,9 +30,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# setup azure client
+# setup azure client — lazy-init to avoid crash if env vars are missing at startup
 AZURE_OPENAI_API_KEY = os.getenv("OPENAI_AZURE_API")
-SECONDARY_AZURE_OPENAI_API_KEY_ = os.getenv("SECONDARY_OPENAI_AZURE_API")
 AZURE_OPENAI_ENDPOINT = os.getenv("ENDPOINT_AZURE_OPENAI")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
 AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
@@ -41,17 +40,30 @@ ENDPOINT_AZURE_OPENAI_IMAGE = os.getenv("ENDPOINT_AZURE_OPENAI_IMAGE")
 AZURE_OPENAI_API_IMAGE_VERSION = os.getenv("AZURE_OPENAI_API_IMAGE_VERSION")
 AZURE_OPENAI_IMAGE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_IMAGE_DEPLOYMENT_NAME")
 
-client = AzureOpenAI(
-    azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_key=AZURE_OPENAI_API_KEY,
-    api_version=AZURE_OPENAI_API_VERSION,
-)
+_client = None
+_photo_client = None
 
-photo_client = AzureOpenAI(
-    azure_endpoint=ENDPOINT_AZURE_OPENAI_IMAGE,
-    api_key=AZURE_OPENAI_IMAGE_API_KEY,
-    api_version=AZURE_OPENAI_API_IMAGE_VERSION,
-)
+def get_client():
+    """Get or create the caption/text AzureOpenAI client."""
+    global _client
+    if _client is None:
+        _client = AzureOpenAI(
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_key=AZURE_OPENAI_API_KEY,
+            api_version=AZURE_OPENAI_API_VERSION,
+        )
+    return _client
+
+def get_photo_client():
+    """Get or create the image generation AzureOpenAI client."""
+    global _photo_client
+    if _photo_client is None:
+        _photo_client = AzureOpenAI(
+            azure_endpoint=ENDPOINT_AZURE_OPENAI_IMAGE,
+            api_key=AZURE_OPENAI_IMAGE_API_KEY,
+            api_version=AZURE_OPENAI_API_IMAGE_VERSION,
+        )
+    return _photo_client
 
 # setup pydactic models ---
 class CaptionRequest(BaseModel):
@@ -100,7 +112,7 @@ async def generate_image(
 
     # Call Azure gpt-image-1.5
     try:
-        response = photo_client.images.generate(
+        response = get_photo_client().images.generate(
             model=os.getenv("AZURE_OPENAI_IMAGE_DEPLOYMENT_NAME", "gpt-image-1.5"),
             prompt=image_prompt,
             n=1
@@ -145,7 +157,7 @@ async def generate_caption(request: CaptionRequest):
 
     # CALL LLM
     try:
-        response = client.chat.completions.create(
+        response = get_client().chat.completions.create(
             model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o"),
             messages=[
                 {"role": "system", "content": system_prompt},
