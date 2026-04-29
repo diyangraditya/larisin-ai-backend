@@ -75,12 +75,12 @@ async def generate_image(
     business_gaya_promosi: str = Form(...),
     instruksi_tambahan: Optional[str] = Form(None)
 ):
-    # Read File and Upload Photo to Blob
+    # Read File and Upload Original Photo to Blob
     file_bytes = await file.read()
     try:
-        original_image_url = await upload_image(
-            image_bytes=file_bytes, 
-            filename=file.filename, 
+        original_image_url = upload_image(
+            image_bytes=file_bytes,
+            filename=f"originals/{file.filename}",
             content_type=file.content_type
         )
         print(f"Foto asli berhasil diupload: {original_image_url}")
@@ -103,8 +103,14 @@ async def generate_image(
             prompt=image_prompt,
             n=1
         )
-        result_image_base64 = response.data[0].b64_json
-        result_image_url = f"data:image/png;base64,{result_image_base64}"
+        # gpt-image-1 series always returns base64, decode and upload to Blob
+        image_base64 = response.data[0].b64_json
+        image_bytes = base64.b64decode(image_base64)
+        result_image_url = upload_image(
+            image_bytes=image_bytes,
+            filename=f"generated/{uuid.uuid4()}.png",
+            content_type="image/png"
+        )
         
         # Response to Frontend
         return {
