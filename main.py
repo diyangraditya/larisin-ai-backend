@@ -19,10 +19,12 @@ from larisin_pkg.db.blob import upload_image
 
 app = FastAPI(title="Larisin AI API")
 
-# CORS Middleware
+# CORS Middleware — set ALLOWED_ORIGINS env var in production (comma-separated)
+# Example: ALLOWED_ORIGINS=https://larisin-frontend.azurestaticapps.net,https://larisin.vercel.app
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

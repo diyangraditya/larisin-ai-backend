@@ -2,5 +2,7 @@
 .env
 .python-version
 /.claude
+/.gemini
 /photo-test
+/__pycache__
 Larisin-AI-Backend-API-Docs.postman_collection.json
