@@ -9,7 +9,7 @@ COSMOS_KEY = os.getenv("COSMOS_KEY")
 DATABASE_NAME = os.getenv("DB_NAME")
 CONTAINER_NAME = os.getenv("CONTAINER_NAME")
 
-# Lazy-init: don't crash at import time if env vars are missing
+# Lazy-init
 _cosmos_container = None
 
 def _get_container():
@@ -32,7 +32,7 @@ def _get_container():
     return _cosmos_container
 
 
-# store history
+# Store History
 def save_history(data: dict):
     if "id" not in data:
         import uuid

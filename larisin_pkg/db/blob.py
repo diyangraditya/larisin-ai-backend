@@ -9,7 +9,7 @@ AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 AZURE_STORAGE_CONTAINER_NAME = os.getenv("AZURE_STORAGE_CONTAINER_NAME")
 AZURE_STORAGE_CONTAINER_URL = os.getenv("AZURE_STORAGE_CONTAINER_URL")
 
-# Lazy-init: don't crash at import time if env vars are missing
+# Lazy-init
 blob_service_client = None
 container_client = None
 

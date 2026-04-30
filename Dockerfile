@@ -1,15 +1,15 @@
 FROM python:3.11-slim
 
-# Install uv (fast Python package manager used by this project)
+# Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# Copy dependency manifests first (better Docker layer caching)
+# Copy dependency manifests
 COPY pyproject.toml uv.lock ./
 COPY larisin_pkg/pyproject.toml ./larisin_pkg/pyproject.toml
 
-# Install all dependencies into the project venv
+# Install all dependencies
 RUN uv sync --frozen --no-dev
 
 # Copy application source

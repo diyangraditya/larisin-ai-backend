@@ -2,7 +2,6 @@ import os
 import json
 import uuid
 import base64
-import requests
 
 from datetime import datetime
 from dotenv import load_dotenv
@@ -19,8 +18,7 @@ from larisin_pkg.db.blob import upload_image
 
 app = FastAPI(title="Larisin AI API")
 
-# CORS Middleware — set ALLOWED_ORIGINS env var in production (comma-separated)
-# Ex: ALLOWED_ORIGINS=https://larisin-frontend.azurestaticapps.net,https://larisin.vercel.app
+# CORS Middleware
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -30,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# setup azure client — lazy-init to avoid crash if env vars are missing at startup
+# Setup Azure Client
 AZURE_OPENAI_API_KEY = os.getenv("OPENAI_AZURE_API")
 AZURE_OPENAI_ENDPOINT = os.getenv("ENDPOINT_AZURE_OPENAI")
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION")
@@ -65,7 +63,7 @@ def get_photo_client():
         )
     return _photo_client
 
-# setup pydactic models ---
+# Setup Pydactic Models
 class CaptionRequest(BaseModel):
     image_url: str
     fokus_promosi: str
@@ -76,7 +74,7 @@ class CaptionRequest(BaseModel):
 
 @app.get("/")
 async def read_root():
-    return {"message": "the backend is running"}
+    return {"message": "Larisin AI backend services is running"}
 
 @app.post("/api/v1/ai/generate-image")
 async def generate_image(
@@ -117,7 +115,6 @@ async def generate_image(
             prompt=image_prompt,
             n=1
         )
-        # gpt-image-1 series always returns base64, decode and upload to Blob
         image_base64 = response.data[0].b64_json
         image_bytes = base64.b64decode(image_base64)
         result_image_url = upload_image(
@@ -141,7 +138,7 @@ async def generate_image(
 @app.post("/api/v1/ai/generate-caption")
 async def generate_caption(request: CaptionRequest):
     
-    # SETUP SYSTEM PROMPT
+    # Setup System Prompt
     system_prompt = (
         f"Kamu adalah seorang Social Media Manager dan Copywriter pro. "
         f"Target audiens adalah: {request.business_target}. "
@@ -155,7 +152,7 @@ async def generate_caption(request: CaptionRequest):
 
     user_prompt = f"Buatkan caption untuk mempromosikan {request.business_jenis} dengan fokus pada {request.fokus_promosi}."
 
-    # CALL LLM
+    # Call LLM
     try:
         response = get_client().chat.completions.create(
             model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-4o"),
@@ -167,7 +164,7 @@ async def generate_caption(request: CaptionRequest):
             temperature=0.7
         )
         
-        # Parsing JSON dari response text AI
+        # Parse JSON from AI response
         ai_content = response.choices[0].message.content
         ai_result = json.loads(ai_content)
         
@@ -180,29 +177,29 @@ async def generate_caption(request: CaptionRequest):
 
     except Exception as e:
         # If AI fails (ex: timeout or out of tokens), return 500 error to Frontend
-        print(f"Error dari AI Engine: {e}")
+        print(f"Error from AI Engine: {e}")
         raise HTTPException(status_code=500, detail=f"AI gagal memproses: {str(e)}")
 
-    # STORE TO AZURE COSMOS DB
+    # Store to Cosmos DB
     history_data = {
         "id": str(uuid.uuid4()),               # Document Primary Key
         "user_id": "demo-user-123",            # Partition Key (Temporarily Hardcoded)
-        "timestamp": datetime.utcnow().isoformat() + "Z", # standar ISO time format
-        "input_metadata": request.model_dump(),      # store any input from the user
-        "result_captions": captions,           # output AI
+        "timestamp": datetime.utcnow().isoformat() + "Z", # Standard ISO time format
+        "input_metadata": request.model_dump(),      # Store any input from the user
+        "result_captions": captions,           # Output AI
         "result_hashtags": hashtags
     }
 
     try:
-        # Memanggil fungsi save_history yang sudah kita buat sebelumnya
+        # Calling the save_history function
         save_history(history_data)
-        print(f"[SUCCESS] History tersimpan di Cosmos DB dengan ID: {history_data['id']}")
+        print(f"[SUCCESS] History saved to Cosmos DB with ID: {history_data['id']}")
     except Exception as db_error:
-        print(f"[WARNING] Gagal simpan ke Cosmos DB (Non-fatal): {db_error}")
+        print(f"[WARNING] Failed to save to Cosmos DB (Non-fatal): {db_error}")
 
     return {
         "status": "success",
-        "job_id": history_data["id"], # Berguna jika FE mau manggil ID ini lagi
+        "job_id": history_data["id"],
         "captions": captions,
         "hashtags": hashtags
     }
