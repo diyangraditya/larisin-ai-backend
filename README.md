@@ -69,3 +69,4 @@ Built with ❤️ for **Microsoft Elevate Hackathon**
 |---|---|
 | Backend & AI | [@diyangraditya](https://github.com/diyangraditya) |
 | Frontend | [@nismafaaa](https://github.com/nismafaaa) |
+| PM & UI UX Designer | [@najwa](https://www.linkedin.com/in/najmuthia/) |
